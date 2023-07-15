@@ -1,11 +1,23 @@
 # VPS to Arch with LUKS&LVM
 
-Install Arch Linux with LUKS over LVM. Boot unlock by SSH.
+Install Arch Linux with LUKS over LVM on your VPS.
 
-## How it works
+Remote boot-time disk decryption via SSH.
+
+## How it works (Codeless Version)
+1. Download Arch ISO and memdisk to boot partition, boot to Memdisk, run Arch ISO from RAM.
+2. Delete all partitions, create Boot & LVM & Swap partitions. Boot partition minimum 2GB
+3. In the first place. Install GRUB2 to boot partition. Then download memdisk and arch ISO again. So we have a full functional rescue system now.
+4. Make PV, VG, LV with LVM partition.
+5. Setup LUKS over LVM.
+6. Install Arch to decrypted LUKS filesystem. Setup SSH decryption.
+7. Update GRUB2 and initramfs for LUKS and SSH decryption.
+8. Reboot to New Arch System.
+
+## How it works (Code Version)
 
 1. Boot to Memdisk, run Arch ISO from RAM.
-2. Erase system disk, create Boot & LVM & Swap & Recovery partitions.
+2. Erase system disk, create Boot & LVM & Swap partitions.
 3. Create PV, VG, LV
 4. Create LUKS over LV, mount to /mnt, format ext4
 5. Mount Boot partition to /mnt/boot
@@ -19,12 +31,12 @@ Install Arch Linux with LUKS over LVM. Boot unlock by SSH.
 11. Add public key to `/etc/dropbear/root_key`
 12. `grub-install --target=i386-pc /dev/XdY`
 13. Edit /etc/default/grub:
-    1.  `device_UUID=$(blkid -s UUID -s TYPE -o value | grep crypto_LUKS -B 1 | head -n 1)`
-    2.  `GRUB_CMDLINE_LINUX_DEFAULT` append `ip=dhcp cryptdevice=UUID=${DEVICE_UUID}:root root=/dev/mapper/root`
-        * ip=dhcp can be replaced with static ip, e.g.
-        * ip=192.168.1.1:::::eth0:none
-        * ip=192.168.1.1::192.168.1.254:255.255.255.0::eth0:none
-    3.  `GRUB_ENABLE_CRYPTODISK=y`
+    1.  `GRUB_ENABLE_CRYPTODISK=y`
+    2.  `device_UUID=$(blkid -s UUID -s TYPE -o value | grep crypto_LUKS -B 1 | head -n 1)`
+    3.  `GRUB_CMDLINE_LINUX_DEFAULT` append `ip=dhcp cryptdevice=UUID=${DEVICE_UUID}:root root=/dev/mapper/root`
+        * **ip=dhcp** can be replaced with static ip, e.g.
+        * **ip=192.168.1.1:::::eth0:none**
+        * **ip=192.168.1.1::192.168.1.254:255.255.255.0::eth0:none**
 14. `grub-mkconfig -o /boot/grub/grub.cfg` to apply changes.
 15. Finish regular arch installation.
 
@@ -44,7 +56,9 @@ DO NOT REBOOT UNLESS YOU KNOW WHAT YOU ARE DOING.
 
 ## Something went wrong. How to recover?
 
-Re-install the OS from the VPS provider's control panel. Consider retrying the script.
+1. Quick fix: Reboot to memdisk with files in boot partition.
+
+2. Backup plan: Re-install the OS from the VPS provider's control panel. Consider retrying the script.
 
 ## How to Use
 
