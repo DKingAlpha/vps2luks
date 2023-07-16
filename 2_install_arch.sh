@@ -137,8 +137,8 @@ mount $DEV_BOOT /mnt_boot
 rm -rf /mnt_boot/lost+found
 grub-install --target=i386-pc --boot-directory=/mnt_boot $INSTALL_DISK
 
-curl -L https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso -o /mnt_boot/archlinux-x86_64.iso
-curl -L https://mirrors.edge.kernel.org/pub/linux/utils/boot/syslinux/syslinux-6.03.tar.gz -o /tmp/syslinux-6.03.tar.gz
+curl -L --progress-bar https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso -o /mnt_boot/archlinux-x86_64.iso
+curl -L --progress-bar https://mirrors.edge.kernel.org/pub/linux/utils/boot/syslinux/syslinux-6.03.tar.gz -o /tmp/syslinux-6.03.tar.gz
 tar -xzf /tmp/syslinux-6.03.tar.gz -C /tmp
 find /tmp/syslinux-6.03 -type f -name memdisk -exec cp {} /mnt_boot/ \;
 
@@ -258,6 +258,7 @@ sync
 
 ######## Hand over to user ########
 
+echo ""
 echo "Arch Linux Installed. You can take over now and continue post installation"
 echo "****    LUKS PASSPHRASE IS $LUKS_PASSWORD    ****"
 
