@@ -15,9 +15,9 @@ curl -L https://github.com/DKingAlpha/vps2luks/raw/main/1_bootmemdisk.sh -o 1_bo
 sudo bash 1_bootmemdisk.sh
 ```
 
-### Stage 2: In Arch ISO, run the installation script.
+### Stage 2: In Arch ISO Live CD Environment, run the installation script.
 
-System is accessable from VPS Control Panel -> Console View
+Live CD System should be accessible from VPS Control Panel -> Console View
 
 ```sh
 curl -L https://github.com/DKingAlpha/vps2luks/raw/main/2_install_arch.sh -o 2_install_arch.sh
@@ -28,7 +28,7 @@ sudo bash 2_install_arch.sh <DISK_TO_INSTALL_ARCH>  <SSH_PUBLIC_KEY_FILE>  <LUKS
 # sudo bash 2_install_arch.sh /dev/vda  your_public_key.pub  my_luks_password
 ```
 
-In this process you will be prompted to set root password.
+Note that you will be prompted to set root password.
 
 ### Post Installation
 
@@ -81,15 +81,12 @@ nano /etc/hostname
 
 ## Warning
 
-Everything on the VPS will be lost. Make sure you have a backup of your data before you start.
+Everything on the VPS will be erased. Make sure you have a backup of your data before you start.
 
 Save backup to your local computer or another VPS.
 
-After Wiping the disk, the VPS will be unbootable until GRUB2 is installed to boot partition.\
-DO NOT REBOOT UNLESS YOU KNOW WHAT YOU ARE DOING.
-
 ## Something went wrong. How to recover?
 
-1. Quick fix: Reboot to memdisk with files in boot partition.
+1. Quick fix: Reboot to Arch ISO again. It should be in the GRUB menu.
 
 2. Backup plan: Re-install the OS from the VPS provider's control panel. Consider retrying the script.
