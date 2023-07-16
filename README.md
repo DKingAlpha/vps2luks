@@ -9,16 +9,16 @@ Remote boot-time disk decryption via SSH.
 ### Stage 1: Boot to Memdisk, run Arch ISO from RAM
 
 ```sh
-curl https://raw.githubusercontent.com/DKingAlpha/vps2luks/main/1_bootmemdisk.sh -o 1_bootmemdisk.sh
+curl -L https://github.com/DKingAlpha/vps2luks/raw/main/1_bootmemdisk.sh -o 1_bootmemdisk.sh
 sudo bash 1_bootmemdisk.sh
 ```
 
 ### Stage 2: In Arch ISO, run the installation script.
 
 ```sh
-curl https://raw.githubusercontent.com/DKingAlpha/vps2luks/main/2_install_arch.sh -o 2_install_arch.sh
-curl https://somewhere.com/your_public_key.pub -o your_public_key.pub
-sudo bash 2_install_arch.sh /dev/vda  <LUKS_PASSWORD> <SSH_PUBLIC_KEY_FILE>
+curl -L https://github.com/DKingAlpha/vps2luks/raw/main/2_install_arch.sh -o 2_install_arch.sh
+curl -L https://somewhere.com/your_public_key.pub -o your_public_key.pub
+sudo bash 2_install_arch.sh /dev/vda  <SSH_PUBLIC_KEY_FILE>  <LUKS_PASSWORD>
 ```
 
 ## Requirements
@@ -28,6 +28,8 @@ sudo bash 2_install_arch.sh /dev/vda  <LUKS_PASSWORD> <SSH_PUBLIC_KEY_FILE>
 - Only BIOS is tested. UEFI is untested.
 
 *Tested on Ubuntu 22.04. Other distribution may also work*
+
+**Feedback about compatibility is welcome.**
 
 ## How it works (Codeless Version)
 1. Download Arch ISO and memdisk to boot partition, boot to Memdisk, run Arch ISO from RAM.

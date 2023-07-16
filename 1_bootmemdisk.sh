@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 if [ "$EUID" -ne 0 ]
   then echo "Please run as root"
   exit 1
@@ -14,8 +16,8 @@ for tool in parted curl tar grub-mkconfig find findmnt; do
 done
 
 # download iso and memdisk to root dir
-curl https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso -o /archlinux-x86_64.iso
-curl https://mirrors.edge.kernel.org/pub/linux/utils/boot/syslinux/syslinux-6.03.tar.gz -o /tmp/syslinux-6.03.tar.gz
+curl -L https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso -o /archlinux-x86_64.iso
+curl -L https://mirrors.edge.kernel.org/pub/linux/utils/boot/syslinux/syslinux-6.03.tar.gz -o /tmp/syslinux-6.03.tar.gz
 tar -xzf /tmp/syslinux-6.03.tar.gz -C /tmp
 find /tmp/syslinux-6.03 -type f -name memdisk -exec cp {} / \;
 
@@ -59,4 +61,4 @@ grub-mkconfig -o /boot/grub/grub.cfg
 
 sync
 
-reboot now
+echo "you can reboot now. Arch Live CD will be run automatically at next boot."
