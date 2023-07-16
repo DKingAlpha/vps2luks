@@ -5,13 +5,29 @@ if [ "$EUID" -ne 0 ]
   exit 1
 fi
 
-for tool in parted curl tar grub find findmnt; do
+for tool in parted curl tar grub-mkconfig find findmnt; do
     if ! command -v $tool &> /dev/null
     then
         echo "$tool could not be found"
         exit 1
     fi
 done
+
+# download iso and memdisk to root dir
+curl https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso -o /archlinux-x86_64.iso
+curl https://mirrors.edge.kernel.org/pub/linux/utils/boot/syslinux/syslinux-6.03.tar.gz -o /tmp/syslinux-6.03.tar.gz
+tar -xzf /tmp/syslinux-6.03.tar.gz -C /tmp
+find /tmp/syslinux-6.03 -type f -name memdisk -exec cp {} / \;
+
+if [ ! -f "/archlinux-x86_64.iso" ]; then
+    echo "failed to download archlinux-x86_64.iso"
+    exit 1
+fi
+
+if [ ! -f "/memdisk" ]; then
+    echo "failed to download memdisk"
+    exit 1
+fi
 
 PARTITION_SYSROOT=`findmnt -n -o SOURCE /`
 DISK_BOOT=`echo $PARTITION_SYSROOT | sed 's/[0-9]*$//'`
@@ -40,11 +56,6 @@ EOF
 sed -i "s/GRUB_DEFAULT=.*/GRUB_DEFAULT=arch_memdisk/g" /etc/default/grub
 
 grub-mkconfig -o /boot/grub/grub.cfg
-
-curl http://mirror.0x.sg/archlinux/iso/2023.07.01/archlinux-x86_64.iso -o /mnt/boot/archlinux-x86_64.iso
-curl https://mirrors.edge.kernel.org/pub/linux/utils/boot/syslinux/syslinux-6.03.tar.gz -o /tmp/syslinux-6.03.tar.gz
-tar -xzf /tmp/syslinux-6.03.tar.gz -C /tmp
-find /tmp/syslinux-6.03 -type f -name memdisk -exec cp {} / \;
 
 sync
 
