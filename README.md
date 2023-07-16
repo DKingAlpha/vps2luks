@@ -4,46 +4,40 @@ Install Arch Linux with LUKS over LVM on your VPS.
 
 Remote boot-time disk decryption via SSH.
 
+## How to Use
+
+### Stage 1: Boot to Memdisk, run Arch ISO from RAM
+
+```sh
+curl https://raw.githubusercontent.com/DKingAlpha/vps2luks/main/1_bootmemdisk.sh -o 1_bootmemdisk.sh
+sudo bash 1_bootmemdisk.sh
+```
+
+### Stage 2: In Arch ISO, run the installation script.
+
+```sh
+curl https://raw.githubusercontent.com/DKingAlpha/vps2luks/main/2_install_arch.sh -o 2_install_arch.sh
+curl https://somewhere.com/your_public_key.pub -o your_public_key.pub
+sudo bash 2_install_arch.sh /dev/vda  <LUKS_PASSWORD> <SSH_PUBLIC_KEY_FILE>
+```
+
+## Requirements
+
+- 2GB RAM minimum.
+- Bootloader is grub2. Disk is MBR/GPT.
+- Only BIOS is tested. UEFI is untested.
+
+*Tested on Ubuntu 22.04. Other distribution may also work*
+
 ## How it works (Codeless Version)
 1. Download Arch ISO and memdisk to boot partition, boot to Memdisk, run Arch ISO from RAM.
-2. Delete all partitions, create Boot & LVM & Swap partitions. Boot partition minimum 2GB
+2. Delete all partitions, create Boot & Swap & LVM partitions. Boot partition minimum 2GB
 3. In the first place. Install GRUB2 to boot partition. Then download memdisk and arch ISO again. So we have a full functional rescue system now.
 4. Make PV, VG, LV with LVM partition.
 5. Setup LUKS over LVM.
 6. Install Arch to decrypted LUKS filesystem. Setup SSH decryption.
 7. Update GRUB2 and initramfs for LUKS and SSH decryption.
 8. Reboot to New Arch System.
-
-## How it works (Code Version)
-
-1. Boot to Memdisk, run Arch ISO from RAM.
-2. Erase system disk, create Boot & LVM & Swap partitions.
-3. Create PV, VG, LV
-4. Create LUKS over LV, mount to /mnt, format ext4
-5. Mount Boot partition to /mnt/boot
-6. Install arch to /mnt. Regular setup.
-    * my setup: `pacstrap -K /mnt base base-devel linux linux-firmware grub nano man-pages man-db texinfo lvm2 openssh dhcpcd git curl wget net-tools btop`
-7. Additionally install `lvm2 cryptsetup openssh mkinitcpio-netconf mkinitcpio-dropbear mkinitcpio-utils`
-8. <b>`arch-chroot /mnt`</b>
-9. Insert `lvm2 netconf dropbear encryptssh` to HOOKS in `/etc/mkinitcpio.conf`, between `block` and `filesystems`.
-   * DO NOT ADD `encrypt` along with `encryptssh`!!! THEY BREAK EACH OTHER!!!
-10. `mkinitcpio -p linux`
-11. Add public key to `/etc/dropbear/root_key`
-12. `grub-install --target=i386-pc /dev/XdY`
-13. Edit /etc/default/grub:
-    1.  `GRUB_ENABLE_CRYPTODISK=y`
-    2.  `device_UUID=$(blkid -s UUID -s TYPE -o value | grep crypto_LUKS -B 1 | head -n 1)`
-    3.  `GRUB_CMDLINE_LINUX_DEFAULT` append `ip=dhcp cryptdevice=UUID=${DEVICE_UUID}:root root=/dev/mapper/root`
-        * **ip=dhcp** can be replaced with static ip, e.g.
-        * **ip=192.168.1.1:::::eth0:none**
-        * **ip=192.168.1.1::192.168.1.254:255.255.255.0::eth0:none**
-14. `grub-mkconfig -o /boot/grub/grub.cfg` to apply changes.
-15. Finish regular arch installation.
-
-## Requirements
-
-- Bootloader is grub2. Disk is MBR/GPT.
-- Only BIOS is tested. UEFI is untested.
 
 ## Warning
 
@@ -59,19 +53,3 @@ DO NOT REBOOT UNLESS YOU KNOW WHAT YOU ARE DOING.
 1. Quick fix: Reboot to memdisk with files in boot partition.
 
 2. Backup plan: Re-install the OS from the VPS provider's control panel. Consider retrying the script.
-
-## How to Use
-
-### Stage 1: Boot to Memdisk, run Arch ISO from RAM
-
-```sh
-wget https://raw.githubusercontent.com/DKingAlpha/vps2luks/main/1_bootmemdisk.sh
-sudo bash 1_bootmemdisk.sh
-```
-
-### Stage 2: In Arch ISO, run the installation script.
-
-```sh
-wget https://raw.githubusercontent.com/DKingAlpha/vps2luks/main/2_install_arch.sh
-sudo bash 2_install_arch.sh
-```
