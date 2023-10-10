@@ -113,8 +113,7 @@ parted -s $INSTALL_DISK mkpart primary ext4 \
 
 parted $INSTALL_DISK mkpart primary \
     $((BOOT_PARTITION_SIZE+SWAP_PARTITION_SIZE))GiB 100% \
-    name $((PART_BASE+2)) system \
-    set $((PART_BASE+2)) lvm on
+    name $((PART_BASE+2)) system
 
 
 ######## Variable ########
@@ -162,7 +161,7 @@ find /tmp/syslinux-6.03 -type f -name memdisk -exec cp {} /mnt/boot/ \;
 
 ######## Install Arch ########
 
-pacstrap -K /mnt base base-devel linux linux-firmware grub-bios nano man-pages man-db texinfo lvm2 openssh dhcpcd git curl wget net-tools btop  mkinitcpio-netconf mkinitcpio-dropbear mkinitcpio-utils
+pacstrap -K /mnt base base-devel linux linux-firmware grub-bios nano man-pages man-db texinfo openssh dhcpcd git curl wget net-tools btop  mkinitcpio-netconf mkinitcpio-dropbear mkinitcpio-utils btrfs-progs p7zip
 
 genfstab -U /mnt > /mnt/etc/fstab
 
@@ -170,20 +169,20 @@ genfstab -U /mnt > /mnt/etc/fstab
 rm -rf /mnt/boot/lost+found
 arch-chroot /mnt grub-install --target=i386-pc $INSTALL_DISK
 
-######## Setup initramfs lvm & luks & ssh ########
+######## Setup initramfs & luks & ssh ########
 
 while true; do
-if grep -q "lvm2 netconf dropbear encryptssh" /mnt/etc/mkinitcpio.conf; then
+if grep -q "netconf dropbear encryptssh" /mnt/etc/mkinitcpio.conf; then
     echo "mkinitcpio.conf already patched"
     break
 else
     if grep -q "consolefont block filesystems" /mnt/etc/mkinitcpio.conf; then
-        sed -i 's/consolefont block filesystems/consolefont block lvm2 netconf dropbear encryptssh filesystems/g' /mnt/etc/mkinitcpio.conf
+        sed -i 's/consolefont block filesystems/consolefont block netconf dropbear encryptssh filesystems/g' /mnt/etc/mkinitcpio.conf
         echo "mkinitcpio.conf patched"
         break
     else
         echo "Failed to patch /mnt/etc/mkinitcpio.conf."
-        echo 'Please manually insert "lvm2 netconf dropbear encryptssh" before filesystems HOOKS'
+        echo 'Please manually insert "netconf dropbear encryptssh" before filesystems HOOKS'
         read -p "Press enter to continue"
     fi
 fi
@@ -210,7 +209,7 @@ arch-chroot /mnt dropbearconvert openssh dropbear /etc/ssh/ssh_host_rsa_key /etc
 # regenerate initramfs. this updates changes above.
 arch-chroot /mnt mkinitcpio -p linux || true
 
-######## Setup GRUB for lvm & luks & ssh ########
+######## Setup GRUB for luks & ssh ########
 
 LUKS_DEVICE_UUID=$(blkid -s UUID -s TYPE -o value | grep crypto_LUKS -B 1 | head -n 1)
 sed -i 's/#GRUB_ENABLE_CRYPTODISK.*/GRUB_ENABLE_CRYPTODISK=y/g' /mnt/etc/default/grub
