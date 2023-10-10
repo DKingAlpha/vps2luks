@@ -62,6 +62,9 @@ while true; do
     esac
 done
 
+parted -s $INSTALL_DISK mklabel gpt
+sync
+
 IS_GPT=false
 if `parted $INSTALL_DISK print | grep "Partition Table"  |grep -q gpt`; then
     IS_GPT=true
@@ -79,7 +82,6 @@ done
 ######## Partition Layout ########
 # BIOS boot partition: keep
 # boot partition: 2G
-# swap partition: 2 * mem
 # system partition: rest
 ##################################
 
@@ -109,70 +111,64 @@ parted -s $INSTALL_DISK mkpart primary ext4 \
     name $((PART_BASE+1)) boot \
     set $((PART_BASE+1)) boot on
 
-parted -s $INSTALL_DISK mkpart extended linux-swap \
-    ${BOOT_PARTITION_SIZE}GiB $((BOOT_PARTITION_SIZE+SWAP_PARTITION_SIZE))GiB \
-    set $((PART_BASE+2)) swap on \
-    name $((PART_BASE+2)) swap
-
 parted $INSTALL_DISK mkpart primary \
     $((BOOT_PARTITION_SIZE+SWAP_PARTITION_SIZE))GiB 100% \
-    name $((PART_BASE+3)) system \
-    set $((PART_BASE+3)) lvm on
+    name $((PART_BASE+2)) system \
+    set $((PART_BASE+2)) lvm on
 
 
 ######## Variable ########
 DEV_BOOT=${INSTALL_DISK}$((PART_BASE+1))
-DEV_SWAP=${INSTALL_DISK}$((PART_BASE+2))
-DEV_SYSTEM=${INSTALL_DISK}$((PART_BASE+3))
+DEV_SYSTEM=${INSTALL_DISK}$((PART_BASE+2))
 
-mkswap -f $DEV_SWAP
-swapon $DEV_SWAP
-
-######## Install Grub to /boot ########
-
-mkfs.ext4 -F $DEV_BOOT
-
-mkdir -p /mnt_boot
-mount $DEV_BOOT /mnt_boot
-rm -rf /mnt_boot/lost+found
-grub-install --target=i386-pc --boot-directory=/mnt_boot $INSTALL_DISK
-
-curl -L --progress-bar https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso -o /mnt_boot/archlinux-x86_64.iso
-curl -L --progress-bar https://mirrors.edge.kernel.org/pub/linux/utils/boot/syslinux/syslinux-6.03.tar.gz -o /tmp/syslinux-6.03.tar.gz
-tar -xzf /tmp/syslinux-6.03.tar.gz -C /tmp
-find /tmp/syslinux-6.03 -type f -name memdisk -exec cp {} /mnt_boot/ \;
-
-######## Setup LVM ########
-VG_NAME=VG0
-LV_NAME_ROOT=lv_root
-
-pvcreate $DEV_SYSTEM
-vgcreate $VG_NAME $DEV_SYSTEM
-lvcreate -l 100%FREE -n $LV_NAME_ROOT $VG_NAME
-
-echo -n $LUKS_PASSWORD | cryptsetup -q luksFormat /dev/$VG_NAME/$LV_NAME_ROOT -
-echo -n $LUKS_PASSWORD | cryptsetup -q open /dev/$VG_NAME/$LV_NAME_ROOT root - 
+######## LUKS ########
+echo -n $LUKS_PASSWORD | cryptsetup -q luksFormat $DEV_SYSTEM -
+echo -n $LUKS_PASSWORD | cryptsetup -q open $DEV_SYSTEM root - 
 
 _DEV_DECRYPTED_ROOT=/dev/mapper/root
-mkfs.ext4 -F $_DEV_DECRYPTED_ROOT
+mkfs.btrfs -L arch $_DEV_DECRYPTED_ROOT
 
-umount /mnt_boot
-rmdir /mnt_boot
 mount $_DEV_DECRYPTED_ROOT /mnt
-mkdir -p /mnt/boot
+# btrfs setup
+btrfs subvolume create /mnt/@
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@opt
+btrfs subvolume create /mnt/@snapshots
+btrfs subvolume create /mnt/@swap
+btrfs subvolume create /mnt/@log
+btrfs subvolume create /mnt/@pkg
+# mount btrfs
+mount -o subvol=@ $_DEV_DECRYPTED_ROOT /mnt
+mkdir -p /mnt/{boot,home,opt,.snapshots,swap,var/log,var/cache/pacman/pkg}
+mount -o subvol=@home $_DEV_DECRYPTED_ROOT /mnt/home
+mount -o subvol=@opt $_DEV_DECRYPTED_ROOT /mnt/opt
+mount -o subvol=@snapshots $_DEV_DECRYPTED_ROOT /mnt/.snapshots
+mount -o subvol=@swap $_DEV_DECRYPTED_ROOT /mnt/swap
+mount -o subvol=@log $_DEV_DECRYPTED_ROOT /mnt/var/log
+mount -o subvol=@pkg $_DEV_DECRYPTED_ROOT /mnt/var/cache/pacman/pkg
+# swap
+btrfs filesystem mkswapfile --size ${SWAP_PARTITION_SIZE}g --uuid clear /mnt/swap/swapfile
+swapon /mnt/swap/swapfile
+# boot
+mkfs.ext4 -F $DEV_BOOT
 mount $DEV_BOOT /mnt/boot
+
+#### download ISO
+curl -L --progress-bar https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso -o /mnt/boot/archlinux-x86_64.iso
+curl -L --progress-bar https://mirrors.edge.kernel.org/pub/linux/utils/boot/syslinux/syslinux-6.03.tar.gz -o /tmp/syslinux-6.03.tar.gz
+tar -xzf /tmp/syslinux-6.03.tar.gz -C /tmp
+find /tmp/syslinux-6.03 -type f -name memdisk -exec cp {} /mnt/boot/ \;
+
 
 ######## Install Arch ########
 
 pacstrap -K /mnt base base-devel linux linux-firmware grub-bios nano man-pages man-db texinfo lvm2 openssh dhcpcd git curl wget net-tools btop  mkinitcpio-netconf mkinitcpio-dropbear mkinitcpio-utils
 
 genfstab -U /mnt > /mnt/etc/fstab
-SWAP_UUID=`blkid -s UUID -s TYPE -o value $DEV_SWAP | head -n 1`
-cat << EOF >> /mnt/etc/fstab
 
-# $DEV_SWAP
-UUID=$SWAP_UUID  none   swap    defaults       0       0
-EOF
+######## Install Grub to /boot ########
+rm -rf /mnt/boot/lost+found
+arch-chroot /mnt grub-install --target=i386-pc $INSTALL_DISK
 
 ######## Setup initramfs lvm & luks & ssh ########
 
@@ -212,7 +208,7 @@ arch-chroot /mnt dropbearconvert openssh dropbear /etc/ssh/ssh_host_ecdsa_key /e
 arch-chroot /mnt dropbearconvert openssh dropbear /etc/ssh/ssh_host_rsa_key /etc/dropbear/dropbear_rsa_host_key
 
 # regenerate initramfs. this updates changes above.
-arch-chroot /mnt mkinitcpio -p linux
+arch-chroot /mnt mkinitcpio -p linux || true
 
 ######## Setup GRUB for lvm & luks & ssh ########
 
@@ -221,7 +217,7 @@ sed -i 's/#GRUB_ENABLE_CRYPTODISK.*/GRUB_ENABLE_CRYPTODISK=y/g' /mnt/etc/default
 if grep -q 'cryptdevice=' /mnt/etc/default/grub; then
     echo "cryptdevice already patched"
 else
-    sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT=\"/GRUB_CMDLINE_LINUX_DEFAULT=\"ip=dhcp netconf_timeout=180 cryptdevice=UUID=$LUKS_DEVICE_UUID:root root=\/dev\/mapper\/root /g" /mnt/etc/default/grub
+    sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT=\"/GRUB_CMDLINE_LINUX_DEFAULT=\"ip=dhcp netconf_timeout=180 cryptdevice=UUID=$LUKS_DEVICE_UUID:root root=\/dev\/mapper\/root rootflags=subvol=@ /g" /mnt/etc/default/grub
     echo "cryptdevice patched"
 fi
 
@@ -241,6 +237,9 @@ fi
 cat << EOF > /mnt/etc/grub.d/40_custom
 #!/bin/sh
 exec tail -n +3 \$0
+# This file provides an easy way to add custom menu entries.  Simply type the
+# menu entries you want to add after this comment.  Be careful not to change
+# the 'exec tail' line above.
 menuentry "Boot Arch ISO"  \$menuentry_id_option arch_memdisk {
     set root=(hd$INSTALL_DISK_INDEX,$GPT_FLAG$((PART_BASE+1)))
     insmod memdisk
